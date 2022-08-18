@@ -86,7 +86,7 @@ class CocoDataset(Dataset):
 
         # 获取对应图片的注释的编号
         annotations_ids = self.coco.getAnnIds(imgIds=self.image_ids[image_index], iscrowd=False)
-        annotations     = np.zeros((0, 5))
+        annotations     = np.zeros((0, 7))
 
         # some images appear to miss annotations (like image with id 257034) 或者就是没有注释(在本任务中的采样方法)
         if len(annotations_ids) == 0:
@@ -101,9 +101,11 @@ class CocoDataset(Dataset):
             if a['bbox'][2] < 1 or a['bbox'][3] < 1:
                 continue
 
-            annotation        = np.zeros((1, 5))
+            annotation        = np.zeros((1, 7))
             annotation[0, :4] = a['bbox']
             annotation[0, 4]  = self.coco_label_to_label(a['category_id'])
+            annotation[0, 5]  = self.scannerId_to_label(a['scanner_id'])
+            annotation[0, 6]  = self.cancerId_to_label(a['tumor_label'])
             annotations       = np.append(annotations, annotation, axis=0)
 
         # transform from [x, y, w, h] to [x1, y1, x2, y2]
@@ -123,7 +125,34 @@ class CocoDataset(Dataset):
         image = self.coco.loadImgs(self.image_ids[image_index])[0]
         return float(image['width']) / float(image['height'])
 
-    
+    def scannerId_to_label(self,scanner_id):
+        if(scanner_id == "3DHistech Pannoramic Scan II"):
+            label = 1
+        elif(scanner_id == "Aperio ScanScope CS2"):
+            label = 2
+        elif(scanner_id == "Hamamatsu NanoZoomer XR"):
+            label = 3
+        else:
+            label = 0
+        return label
+
+    def cancerId_to_label(self,cancer_id):
+        if(cancer_id == "breast"):
+            label = 1
+        elif(cancer_id == "lung"):
+            label = 2
+        elif(cancer_id == "lymphoma"):
+            label = 3
+        elif(cancer_id == "mast celll tumor"):
+            label = 4
+        elif(cancer_id == "paostate"):
+            label = 5
+        elif(cancer_id == "melanoma"):
+            label = 6
+        else:
+            label = 0
+        return label
+
     def num_classes(self):
         return 2
 
@@ -326,7 +355,7 @@ def collater(data):
     
     if max_num_annots > 0:
 
-        annot_padded = torch.ones((len(annots), max_num_annots, 5)) * -1
+        annot_padded = torch.ones((len(annots), max_num_annots, 7)) * -1
 
         if max_num_annots > 0:
             for idx, annot in enumerate(annots):
@@ -334,7 +363,7 @@ def collater(data):
                 if annot.shape[0] > 0:
                     annot_padded[idx, :annot.shape[0], :] = annot
     else:
-        annot_padded = torch.ones((len(annots), 1, 5)) * -1
+        annot_padded = torch.ones((len(annots), 1, 7)) * -1
 
 
     padded_imgs = padded_imgs.permute(0, 3, 1, 2)
